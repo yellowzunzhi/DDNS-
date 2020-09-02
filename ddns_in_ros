@@ -1,0 +1,38 @@
+# 在ros环境实现ddns
+# system-->Scripts
+
+#PPPoE
+:local pppoe "pppoe-out1"
+
+#DNSPOD token
+:local token "xxxxx,xxxxxxxxxxxxxxxxxxx"
+
+#域名
+:local domain "abc.com"
+
+#域名主机名
+:local subdomain "www"
+
+#domain
+:local dname ($subdomain.".".$domain)
+
+#获取pppoe拨号ip
+:local ipaddr [/ip address get [/ip address find interface=$pppoe] address]
+:set ipaddr [:pick $ipaddr 0 ([len $ipaddr] -3)]
+
+#获取域名列表
+:local record [/tool fetch url="https://dnsapi.cn/Record.List" http-data="login_token=$token&format=json&domain=$domain&sub_domain=$subdomain&record_type=A" as-value output=user]
+
+#获取id和ip
+:set record ($record->"data")
+:set record [:pick $record [:find $record "\"records\":"] [:len $record]]
+:local recordid [:pick $record ([:find $record "\"id\":\""]+6) [:find $record "\",\"ttl"]]
+:local recordip [:pick $record ([:find $record "\"value\":\""]+9) [:find $record "\",\"en"]]
+
+#更新ip地址
+:if ($recordip!=$ipaddr) do={
+/tool fetch url="https://dnsapi.cn/Record.Ddns" http-data="login_token=$token&format=json&domain=$domain&sub_domain=$subdomain&record_id=$recordid&record_line_id=0&value=$ipaddr"
+:log info ("[".$dname."] ip update")
+} else={
+:log info ("[".$dname."] ip not update")
+}
